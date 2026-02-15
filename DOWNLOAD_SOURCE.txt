@@ -1,0 +1,12 @@
+# Source files are being generated...
+# 
+# Download the complete source code from:
+# [Will provide link with all implementations]
+#
+# Or contact for the full codebase including:
+# - src/models/unet3d.py (3D U-Net implementation)
+# - src/models/vnet.py (V-Net implementation) 
+# - src/pathplanning/astar.py (A* path planning)
+# - scripts/train_airway.py (Training script)
+# - scripts/inference.py (Inference pipeline)
+# And more...

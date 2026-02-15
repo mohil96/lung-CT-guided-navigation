@@ -1,0 +1,71 @@
+# 3D U-Net Configuration for Airway Segmentation
+
+model:
+  name: "UNet3D"
+  in_channels: 1
+  out_channels: 1
+  features: [32, 64, 128, 256, 512]
+  trilinear: true
+  deep_supervision: false
+
+training:
+  batch_size: 4
+  num_epochs: 200
+  num_workers: 4
+  pin_memory: true
+
+  # Learning rate
+  learning_rate: 0.001
+  weight_decay: 0.0001
+
+  # Mixed precision training
+  use_amp: true
+
+  # Gradient accumulation
+  gradient_accumulation_steps: 2
+
+loss:
+  type: "CombinedLoss"
+  dice_weight: 0.6
+  bce_weight: 0.4
+  smooth: 1.0e-5
+
+optimizer:
+  type: "Adam"
+  betas: [0.9, 0.999]
+  eps: 1.0e-8
+
+scheduler:
+  type: "ReduceLROnPlateau"
+  mode: "max"  # Maximize Dice score
+  factor: 0.5
+  patience: 10
+  min_lr: 1.0e-6
+  verbose: true
+
+data:
+  patch_size: [128, 128, 128]
+  spacing: [1.0, 1.0, 1.0]  # mm
+  intensity_range: [-1000, 400]  # HU window
+
+augmentation:
+  enabled: true
+  rotation_range: 15  # degrees
+  scale_range: [0.9, 1.1]
+  flip_probability: 0.5
+  elastic_deformation: true
+  gaussian_noise_std: 0.01
+
+validation:
+  frequency: 1  # epochs
+  num_samples: 10  # samples to visualize
+
+checkpoint:
+  save_frequency: 10  # epochs
+  keep_last_n: 3
+  save_best: true
+  metric: "dice"  # Metric to track for best model
+
+tensorboard:
+  log_dir: "logs"
+  log_frequency: 10  # batches

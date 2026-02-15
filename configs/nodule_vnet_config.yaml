@@ -1,0 +1,60 @@
+# V-Net Configuration for Nodule Detection
+
+model:
+  name: "VNet"
+  in_channels: 1
+  out_channels: 1
+  features: 16
+
+training:
+  batch_size: 8
+  num_epochs: 150
+  num_workers: 4
+  pin_memory: true
+
+  learning_rate: 0.0005
+  weight_decay: 0.0001
+
+  use_amp: true
+  gradient_accumulation_steps: 1
+
+loss:
+  type: "FocalLoss"
+  alpha: 0.25
+  gamma: 2.0
+
+optimizer:
+  type: "Adam"
+  betas: [0.9, 0.999]
+
+scheduler:
+  type: "CosineAnnealingLR"
+  T_max: 150
+  eta_min: 1.0e-6
+
+data:
+  patch_size: [64, 64, 64]
+  spacing: [1.0, 1.0, 1.0]
+  intensity_range: [-1000, 400]
+
+augmentation:
+  enabled: true
+  rotation_range: 20
+  scale_range: [0.85, 1.15]
+  flip_probability: 0.5
+  elastic_deformation: true
+  gaussian_noise_std: 0.02
+
+validation:
+  frequency: 2
+  num_samples: 5
+
+checkpoint:
+  save_frequency: 10
+  keep_last_n: 3
+  save_best: true
+  metric: "dice"
+
+tensorboard:
+  log_dir: "logs"
+  log_frequency: 20
