@@ -1,4 +1,4 @@
-"""Train 3D U-Net for airway segmentation."""
+"""Train V-Net for nodule segmentation."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from tqdm import tqdm
 from src.data import SegmentationDataset, dataset_summary
 from src.models.losses import CombinedLoss, DiceLoss, FocalLoss, TverskyLoss
 from src.models.metrics import dice_coefficient, sensitivity_recall
-from src.models.unet3d import UNet3D
+from src.models.vnet import VNet
 
 
 def seed_everything(seed: int) -> None:
@@ -161,36 +161,31 @@ def main(args: argparse.Namespace) -> None:
     device = torch.device(f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu")
     use_amp = bool(config["training"].get("use_amp", True) and device.type == "cuda")
 
-    model = UNet3D(
+    model = VNet(
         in_channels=config["model"]["in_channels"],
         out_channels=config["model"]["out_channels"],
-        features=config["model"].get("features", [32, 64, 128, 256, 512]),
-        trilinear=config["model"].get("trilinear", True),
-        deep_supervision=config["model"].get("deep_supervision", False),
+        features=config["model"].get("features", 16),
     ).to(device)
 
-    criterion = build_loss(config["loss"]) 
+    criterion = build_loss(config["loss"])
 
     optimizer = torch.optim.Adam(
         model.parameters(),
         lr=float(config["training"]["learning_rate"]),
         weight_decay=float(config["training"].get("weight_decay", 0.0)),
         betas=tuple(config["optimizer"].get("betas", [0.9, 0.999])),
-        eps=float(config["optimizer"].get("eps", 1e-8)),
     )
 
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer,
-        mode=config["scheduler"].get("mode", "max"),
-        factor=float(config["scheduler"].get("factor", 0.5)),
-        patience=int(config["scheduler"].get("patience", 10)),
-        min_lr=float(config["scheduler"].get("min_lr", 1e-6)),
+        T_max=int(config["scheduler"].get("T_max", config["training"]["num_epochs"])),
+        eta_min=float(config["scheduler"].get("eta_min", 1e-6)),
     )
 
     train_dataset = SegmentationDataset(
         data_dir=args.data_dir,
         split="train",
-        mask_suffix="_airway.nii.gz",
+        mask_suffix="_nodule.nii.gz",
         patch_size=config["data"]["patch_size"],
         target_spacing=config["data"]["spacing"],
         intensity_range=config["data"]["intensity_range"],
@@ -199,7 +194,7 @@ def main(args: argparse.Namespace) -> None:
     val_dataset = SegmentationDataset(
         data_dir=args.data_dir,
         split="val",
-        mask_suffix="_airway.nii.gz",
+        mask_suffix="_nodule.nii.gz",
         patch_size=config["data"]["patch_size"],
         target_spacing=config["data"]["spacing"],
         intensity_range=config["data"]["intensity_range"],
@@ -260,7 +255,6 @@ def main(args: argparse.Namespace) -> None:
 
         if epoch % val_freq == 0:
             val_loss, val_dice, val_sens = validate(model, val_loader, criterion, device)
-            scheduler.step(val_dice)
 
             writer.add_scalar("val/loss", val_loss, epoch)
             writer.add_scalar("val/dice", val_dice, epoch)
@@ -275,6 +269,8 @@ def main(args: argparse.Namespace) -> None:
                 save_checkpoint(model, optimizer, epoch, val_dice, ckpt_dir / "checkpoint_best.pth")
                 print(f"Saved best checkpoint at epoch {epoch} (dice={best_dice:.4f})")
 
+        scheduler.step()
+
         if epoch % save_freq == 0:
             save_checkpoint(model, optimizer, epoch, best_dice, ckpt_dir / f"checkpoint_epoch_{epoch}.pth")
 
@@ -283,10 +279,10 @@ def main(args: argparse.Namespace) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train 3D U-Net for airway segmentation")
-    parser.add_argument("--config", type=str, default="configs/airway_unet_config.yaml")
+    parser = argparse.ArgumentParser(description="Train V-Net for nodule segmentation")
+    parser.add_argument("--config", type=str, default="configs/nodule_vnet_config.yaml")
     parser.add_argument("--data_dir", type=str, required=True)
-    parser.add_argument("--output_dir", type=str, default="experiments/airway")
+    parser.add_argument("--output_dir", type=str, default="experiments/nodule")
     parser.add_argument("--gpu", type=int, default=0)
     parser.add_argument("--resume", type=str, default=None)
     parser.add_argument("--seed", type=int, default=42)
